@@ -23,6 +23,6 @@ hf.plot_forecast(y_train, y_test, y_pred, 'Holt-Winter Method', x_label='Time', 
 res_e = y_train - y_train_pred
 pred_e = y_test - y_pred
 
-error_stat_df, _ = hf.cal_error_stat(res_e, pred_e, nm='Holt-Winter' )
+error_stat_df, _ = hf.cal_error_stat(res_e, pred_e, nm='Holt-Winter')
 
 hf.print_tab(error_stat_df)

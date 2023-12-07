@@ -2,18 +2,20 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import helperfunctions as hf  # custom function files
 import statsmodels.api as sm
-import numpy as np
-import scipy.stats as stats
 
 mode_data_path = "../Data/Model Data/"
 target = 'Temperature'
-lags = 30
 
 y_train = hf.make_df(mode_data_path + 'y_st_train.csv')[target]
 y_test = hf.make_df(mode_data_path + 'y_st_test.csv')[target]
 
-order_lst = [(5, 0, 6), (8, 0, 1), (10, 0, 2), (11, 0, 7)]
-# order_lst = [(5, 0, 6), (8, 0, 1)]
+ry = []
+for lag in range(0, 31):
+    ry.append(hf.cal_autocorr(y_train, lag))
+hf.gpac(ry, j_max=15, k_max=15, round_off=2)
+
+# order_lst = [(5, 0, 6), (8, 0, 1), (10, 0, 2), (11, 0, 7)]
+order_lst = [(1, 0, 2)]
 
 res_df = pd.DataFrame(columns=range(10))
 

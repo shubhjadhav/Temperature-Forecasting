@@ -12,6 +12,8 @@ from scipy import signal
 import seaborn as sns
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 import scipy.stats as stats
+from sklearn.model_selection import cross_val_score
+from sklearn import linear_model
 
 warnings.simplefilter('ignore', InterpolationWarning)
 warnings.filterwarnings("ignore")
@@ -346,7 +348,6 @@ def calc_lse(features, target):
 
 
 def calc_ols(features, target):
-    features = sm.add_constant(features, prepend=True)
     model_ols = sm.OLS(target, features)
     result = model_ols.fit()
     return result
@@ -458,15 +459,15 @@ def vif_fs(inp_features, inp_target, logs=0):
 
         least_imp_feature = vif_df[vif_df.imp_rank == 1].feature.values[0]
         features_to_drop.append(least_imp_feature)
-        features.drop(columns=[least_imp_feature], axis=1, inplace=True)
+        temp_features = features.drop(columns=[least_imp_feature], axis=1)
 
-        model = sm.OLS(target, features).fit()
+        model = sm.OLS(target, temp_features).fit()
         aic, bic, adj_r2 = model.aic, model.bic, model.rsquared_adj
 
-        vif_df = cal_vif(features)
+        vif_df = cal_vif(temp_features)
 
         if logs:
-            print(f"\n\n========Step {i}, removing '{least_imp_feature}' and include {len(features.columns)-1} ========features\n")
+            print(f"\n\n========Step {i}, removing '{least_imp_feature}' and include {len(temp_features.columns)-1} ========features\n")
             print(model.summary())
             print('\nAIC = ', aic.round(2))
             print('BIC = ', bic.round(2))
@@ -478,8 +479,10 @@ def vif_fs(inp_features, inp_target, logs=0):
             best_bic = bic
             best_adj_r2 = adj_r2
             i += 1
+            features.drop(columns=[least_imp_feature], axis=1, inplace=True)
         else:
             if logs: print("\nThere is no improvement in the accuracy metrics hence we stop here.")
+            features_to_drop.pop()
             break
 
     imp_features = features.columns.to_list()
@@ -694,11 +697,24 @@ def lm_confidence_interval(theta, cov, na, nb, round_off=4):
         upper_bound.append(theta[i] + 2 * np.sqrt(cov[i, i]))
     lower_bound = np.round(lower_bound, decimals=round_off)
     upper_bound = np.round(upper_bound, decimals=round_off)
-    for i in range(na+nb):
+
+    coeff_df = pd.DataFrame(columns=[' ', 'Lower Bound', 'Upper Bound'])
+
+    for i in range(na + nb):
         if i < na:
-            print(f"AR Coefficient {i + 1}: ({lower_bound[i][0]}, {upper_bound[i][0]})")
+            coeff_df.loc[len(coeff_df)] = {
+                ' ': f"AR coefficient {i + 1}",
+                'Lower Bound': lower_bound[i][0],
+                'Upper Bound': upper_bound[i][0]
+            }
         else:
-            print(f"MA Coefficient {i + 1 - na}: ({lower_bound[i][0]}, {upper_bound[i][0]})")
+            coeff_df.loc[len(coeff_df)] = {
+                ' ': f"MA coefficient {i + 1}",
+                'Lower Bound': lower_bound[i][0],
+                'Upper Bound': upper_bound[i][0]
+            }
+
+    print_tab(coeff_df)
 
 
 def lm_find_roots(theta, na, round_off=4):
@@ -800,7 +816,7 @@ def plot_ts(data, diff=0, seas=0):
     plt.show()
 
 
-def cal_error_stat(residual_error, forecast_error, order=1, r2=-1, nm='Model', rnd=4):
+def cal_error_stat(residual_error, forecast_error, order=1, nm='Model', rnd=4):
     re = []
     lags = 20
 
@@ -817,7 +833,6 @@ def cal_error_stat(residual_error, forecast_error, order=1, r2=-1, nm='Model', r
 
     error_stat = {
         "Model": nm,
-        "R2": round(r2, rnd),
         "Q-Value": round(Q, rnd),
         'Critical-Value': chi_critical,
         "White-Residual": 'Yes' if Q < chi_critical else 'No',
@@ -829,11 +844,58 @@ def cal_error_stat(residual_error, forecast_error, order=1, r2=-1, nm='Model', r
         'var_pred': np.round(np.var(forecast_error), rnd)
     }
 
-    if r2 == -1:
-        del error_stat['R2']
-
-    temp = pd.DataFrame(columns=range(10 if r2 ==-1 else 11))
+    temp = pd.DataFrame(columns=range(10))
     temp.columns = list(error_stat.keys())
     temp.loc[len(temp)] = error_stat
 
     return temp, error_stat
+
+
+def cal_reg_stat(model, x, y_tr, y_tr_pred, y_tst, y_tst_pred, nm='Model', rnd=4):
+
+    print(model.summary())
+
+    residual_error = y_tr - y_tr_pred
+    forecast_error = y_tst - y_tst_pred
+
+    re = []
+    lags = 20
+
+    for lag in range(1, lags + 1):
+        re.append(cal_autocorr(residual_error, lag))
+
+    plot_acf_pcf(residual_error, lags=lags)
+
+    Q = sm.stats.acorr_ljungbox(residual_error, lags=[20], boxpierce=True, return_df=True)['bp_stat'].values[0]
+
+    DOF = 20 - 1
+    alfa = 0.01
+    chi_critical = stats.chi2.ppf(1 - alfa, DOF)
+
+    error_stat = {
+        "Model": nm,
+        "R2": round(model.rsquared, rnd),
+        "Adjusted-R2": round(model.rsquared_adj, rnd),
+        "AIC": round(model.aic, rnd),
+        "BIC": round(model.bic, rnd),
+        "F-test": round(model.f_pvalue, rnd),
+        "Mean Cross-val": round(np.mean(
+            cross_val_score(linear_model.LinearRegression(), x, y_tst, cv=5)
+        ),4),
+        "Q-Value": round(Q, rnd),
+        'Critical-Value': chi_critical,
+        "White-Residual": 'Yes' if Q < chi_critical else 'No',
+        'mse_res': np.round(np.mean(residual_error ** 2), rnd),
+        'var_res': np.round(np.var(residual_error), rnd),
+        'mse_pred': np.round(np.mean(forecast_error ** 2), rnd),
+        'var_pred': np.round(np.var(forecast_error), rnd)
+    }
+
+    temp = pd.DataFrame(columns=range(14))
+    temp.columns = list(error_stat.keys())
+    temp.loc[len(temp)] = error_stat
+
+    return temp, error_stat
+
+
+

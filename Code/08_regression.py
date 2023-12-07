@@ -15,12 +15,12 @@ y_train = hf.make_df(mode_data_path + 'y_train.csv', 0)[target]
 X_test = hf.make_df(mode_data_path + 'X_test.csv', 0)
 y_test = hf.make_df(mode_data_path + 'y_test.csv', 0)[target]
 
-summary_res = pd.DataFrame(columns=range(11))
+summary_res = pd.DataFrame(columns=range(14))
 
 # --------------------------------------------------------------------------------
-#                                    Coefficients using Normal equation
+#               Singular values and Condition number
 # --------------------------------------------------------------------------------
-hf.print_h("Coefficients using Normal equation")
+hf.print_h("Singular values and Condition number")
 
 s, d, v = np.linalg.svd(X_train, full_matrices=True)
 
@@ -28,7 +28,7 @@ print(f'singular values of x are {d}')
 print(f'The condition number for x is {np.linalg.cond(X_train)}')
 
 # --------------------------------------------------------------------------------
-#                                    Coefficients using Normal equation
+#               Coefficients using the Normal equation
 # --------------------------------------------------------------------------------
 hf.print_h("Coefficients using Normal equation")
 
@@ -41,7 +41,7 @@ print(f"\nThe regression model unknown coefficients using the Normal equation")
 hf.print_tab(lse_df)
 
 # --------------------------------------------------------------------------------
-#                                    OLS Model with all features
+#               OLS Model with all features
 # --------------------------------------------------------------------------------
 hf.print_h("OLS Model with all features")
 
@@ -64,16 +64,27 @@ y_pred = ols_model_all_features.predict(X_test)
 hf.plot_forecast(y_train, [], y_train_pred, 'Training Prediction of Temperature using OLS method',
                  y_label='Temperature', x_label="Index")
 hf.plot_forecast([], y_test, y_pred, 'Forecasting Temperature using OLS method', y_label='Temperature', x_label="Index")
+hf.plot_forecast(y_train, y_test, y_pred, 'Train/Test/Forecast plot using OLS method', y_label='Temperature',
+                 x_label="Index")
 
 res_e = (y_train - y_train_pred)
 pred_e = (y_test - y_pred)
-error_stat_df, error_stat = hf.cal_error_stat(res_e, pred_e, r2=r2, nm='All Features')
+error_stat_df, error_stat = hf.cal_reg_stat(
+    ols_model_all_features,
+    X_test,
+    y_train,
+    y_train_pred,
+    y_test,
+    y_pred,
+    nm='All'
+)
+
 hf.print_tab(error_stat_df)
 summary_res.columns = error_stat_df.columns
 summary_res.loc[len(summary_res)] = error_stat
 
 # --------------------------------------------------------------------------------
-#                                    BSR Feature Selection
+#               BSR Feature Selection
 # --------------------------------------------------------------------------------
 hf.print_h("BSR Feature Selection")
 
@@ -95,15 +106,28 @@ hf.plot_forecast(y_train, [], y_train_pred, 'Training Prediction of Temperature 
                  y_label='Temperature', x_label="Index")
 hf.plot_forecast([], y_test, y_pred, 'Forecasting Temperature with BSR reduced features', y_label='Temperature',
                  x_label="Index")
+hf.plot_forecast(y_train, y_test, y_pred, 'Train/Test/Forecast plot using BSR reduced features', y_label='Temperature',
+                 x_label="Index")
 
 res_e = (y_train - y_train_pred)
 pred_e = (y_test - y_pred)
-error_stat_df, error_stat = hf.cal_error_stat(res_e, pred_e, r2=r2, nm='Features from BSR')
+res_e = (y_train - y_train_pred)
+pred_e = (y_test - y_pred)
+error_stat_df, error_stat = hf.cal_reg_stat(
+    ols_model_imp_features,
+    X_test,
+    y_train,
+    y_train_pred,
+    y_test,
+    y_pred,
+    nm='BSR'
+)
 hf.print_tab(error_stat_df)
+summary_res.columns = error_stat_df.columns
 summary_res.loc[len(summary_res)] = error_stat
 
 # --------------------------------------------------------------------------------
-#                                    VIF Feature Selection
+#               VIF Feature Selection
 # --------------------------------------------------------------------------------
 hf.print_h("VIF Feature Selection")
 
@@ -119,21 +143,34 @@ ols_model_imp_features = sm.OLS(y_train, X_train_VIF).fit()
 r2 = ols_model_imp_features.rsquared_adj
 print(f"\n\nR-squared value model with all {X_train_VIF.shape[1]} features: {r2}")
 
-y_train_pred = hf.predict_ols(ols_model_imp_features, X_train)
+y_train_pred = ols_model_imp_features.predict(X_train_VIF)
 y_pred = ols_model_imp_features.predict(X_test_VIF)
 hf.plot_forecast(y_train, [], y_train_pred, 'Training Prediction of Temperature with VIF reduced features',
                  y_label='Temperature', x_label="Index")
 hf.plot_forecast([], y_test, y_pred, 'Forecasting Temperature with VIF reduced features', y_label='Temperature',
                  x_label="Index")
+hf.plot_forecast(y_train, y_test, y_pred, 'Train/Test/Forecast plot using VIF reduced features', y_label='Temperature',
+                 x_label="Index")
 
 res_e = (y_train - y_train_pred)
 pred_e = (y_test - y_pred)
-error_stat_df, error_stat = hf.cal_error_stat(res_e, pred_e, r2=r2, nm='Features from VIF')
+res_e = (y_train - y_train_pred)
+pred_e = (y_test - y_pred)
+error_stat_df, error_stat = hf.cal_reg_stat(
+    ols_model_imp_features,
+    X_test,
+    y_train,
+    y_train_pred,
+    y_test,
+    y_pred,
+    nm='VIF'
+)
 hf.print_tab(error_stat_df)
+summary_res.columns = error_stat_df.columns
 summary_res.loc[len(summary_res)] = error_stat
 
 # --------------------------------------------------------------------------------
-#                                    PCA
+#               PCA
 # --------------------------------------------------------------------------------
 hf.print_h("PCA")
 
@@ -153,17 +190,33 @@ ols_model_pca_features = sm.OLS(y_train, X_train_PCA).fit()
 r2 = ols_model_pca_features.rsquared_adj
 print(f"\n\nR-squared value model with all {X_train_PCA.shape[1]} features: {r2}")
 
-y_train_pred = hf.predict_ols(ols_model_pca_features, X_train_PCA)
+y_train_pred = ols_model_pca_features.predict(X_train_PCA)
+y_train_pred = pd.Series(y_train_pred, index=y_train.index)
 y_pred = ols_model_pca_features.predict(X_test_PCA)
+y_pred = pd.Series(y_pred, index=y_test.index)
 hf.plot_forecast(y_train, [], y_train_pred, 'Training Prediction of Temperature with PCA reduced features',
                  y_label='Temperature', x_label="Index")
 hf.plot_forecast([], y_test, y_pred, 'Forecasting Temperature with PCA reduced features', y_label='Temperature',
                  x_label="Index")
+hf.plot_forecast(y_train, y_test, y_pred, 'Train/Test/Forecast plot using PCA reduced features', y_label='Temperature',
+                 x_label="Index")
 
 res_e = (y_train - y_train_pred)
 pred_e = (y_test - y_pred)
-error_stat_df, error_stat = hf.cal_error_stat(res_e, pred_e, r2=r2, nm='Features from PCA')
+res_e = (y_train - y_train_pred)
+pred_e = (y_test - y_pred)
+error_stat_df, error_stat = hf.cal_reg_stat(
+    ols_model_pca_features,
+    X_test_PCA,
+    y_train,
+    y_train_pred,
+    y_test,
+    y_pred,
+    nm='PCA'
+)
 hf.print_tab(error_stat_df)
+summary_res.columns = error_stat_df.columns
 summary_res.loc[len(summary_res)] = error_stat
 
-hf.print_tab(summary_res)
+hf.print_tab(summary_res.iloc[:, [0] + list(range(7, len(summary_res.columns)))])
+hf.print_tab(summary_res.iloc[:, :7])
