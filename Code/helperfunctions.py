@@ -23,9 +23,9 @@ def print_tab(df):
     print(tabulate(df, headers='keys', tablefmt='psql'))
 
 
-def print_h(text):
+def print_h(text, center=1):
     print("\n\n" + "-"*100)
-    print(" "*40 + text)
+    print(" "* 40 if center else 0 + text)
     print("-" * 100 + "\n\n")
 
 
@@ -557,7 +557,7 @@ def get_arma_input():
     return n, na, nb, ar, ma, mean_e, var_e, lags
 
 
-def gpac(ry, show_heatmap=1, j_max=7, k_max=7, round_off=3, seed=6313):
+def gpac(ry, show_heatmap=1, j_max=7, k_max=7, round_off=2, seed=6313):
     np.random.seed(seed)
     gpac_table = np.zeros((j_max, k_max-1))
 
