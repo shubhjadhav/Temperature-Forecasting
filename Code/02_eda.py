@@ -17,7 +17,7 @@ print(f"Latest Date: {max_date}")
 
 temp_df[target].plot()
 plt.xlabel("Date")
-plt.ylabel("USD($)")
+plt.ylabel("Temperature")
 plt.title("Target to predict: " + target)
 plt.tight_layout()
 plt.grid()
@@ -27,7 +27,7 @@ for i, col in enumerate(temp_df.columns):
     if col == 'Occupancy': continue
     temp_df[col].plot()
     plt.xlabel("Date")
-    plt.ylabel("USD($)")
+    plt.ylabel(col)
     plt.title(col)
     plt.tight_layout()
     plt.grid()
